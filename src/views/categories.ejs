@@ -1,0 +1,250 @@
+<% title = 'Categories' %>
+
+<!-- Page Header -->
+<section class="page-header bg-gradient-primary text-white py-5">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-8">
+        <h1 class="display-4 fw-bold mb-3">
+          <i class="fas fa-tags me-3"></i>
+          Product Categories
+        </h1>
+        <p class="lead mb-0">
+          Explore our comprehensive range of electronics categories and find
+          exactly what you're looking for
+        </p>
+      </div>
+      <div class="col-lg-4 text-lg-end">
+        <div class="d-flex align-items-center justify-content-lg-end">
+          <span class="badge bg-white bg-opacity-25 fs-6 me-3">
+            <i class="fas fa-box me-1"></i>
+            <%= categories.length %> Categories
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Search and Filter Section -->
+<section class="py-4 bg-light">
+  <div class="container">
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <div class="input-group">
+          <span class="input-group-text bg-white border-end-0">
+            <i class="fas fa-search text-muted"></i>
+          </span>
+          <input
+            type="text"
+            class="form-control border-start-0"
+            id="categorySearch"
+            placeholder="Search categories..."
+          />
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <select class="form-select" id="categorySort">
+          <option value="name">Sort by Name</option>
+          <option value="products">Sort by Products</option>
+          <option value="newest">Newest First</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Categories Grid -->
+<section class="py-5">
+  <div class="container">
+    <!-- Loading State -->
+    <div id="loadingState" class="text-center py-5" style="display: none">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="mt-3 text-muted">Loading categories...</p>
+    </div>
+
+    <!-- Categories Content -->
+    <div id="categoriesContent">
+      <% if (categories.length === 0) { %>
+      <!-- Empty State -->
+      <div class="text-center py-5">
+        <div class="empty-state">
+          <i
+            class="fas fa-box-open text-muted"
+            style="font-size: 4rem; margin-bottom: 1rem"
+          ></i>
+          <h3 class="text-muted mb-3">No Categories Found</h3>
+          <p class="text-muted mb-4">
+            We're working on adding amazing categories for you.
+          </p>
+          <a href="/" class="btn btn-primary">
+            <i class="fas fa-home me-2"></i>
+            Back to Home
+          </a>
+        </div>
+      </div>
+      <% } else { %>
+      <!-- Categories Grid -->
+      <div class="row g-4" id="categoriesGrid">
+        <% categories.forEach((category, index) => { %>
+        <div
+          class="col-xl-4 col-lg-6 col-md-6 category-item"
+          data-name="<%= category.main_category.toLowerCase() %>"
+          data-products="<%= category.product_count || 0 %>"
+          data-date="<%= category.created_at %>"
+        >
+          <div class="card category-card h-100 border-0 shadow-sm hover-lift">
+            <div class="card-body p-4">
+              <!-- Category Icon -->
+              <div class="category-icon-wrapper mb-4">
+                <div class="category-icon">
+                  <i class="fas <%= category.icon_class || 'fa-tag' %>"></i>
+                </div>
+              </div>
+
+              <!-- Category Info -->
+              <div class="category-info">
+                <h4 class="category-title mb-3">
+                  <a
+                    href="/categories/<%= category.id %>"
+                    class="text-decoration-none text-dark"
+                  >
+                    <%= category.main_category %>
+                  </a>
+                </h4>
+
+                <p class="category-description text-muted mb-4">
+                  <%= category.description %>
+                </p>
+
+                <!-- Category Stats -->
+                <div
+                  class="category-stats d-flex justify-content-between align-items-center mb-4"
+                >
+                  <div class="stat-item">
+                    <span class="stat-number"
+                      ><%= category.product_count || 0 %></span
+                    >
+                    <span class="stat-label">Products</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-number"
+                      ><%= category.subcategory_count || 0 %></span
+                    >
+                    <span class="stat-label">Subcategories</span>
+                  </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="category-actions">
+                  <a
+                    href="/categories/<%= category.id %>"
+                    class="btn btn-primary btn-sm w-100 mb-2"
+                  >
+                    <i class="fas fa-eye me-2"></i>
+                    View Category
+                  </a>
+                  <a
+                    href="/products?category=<%= category.id %>"
+                    class="btn btn-outline-primary btn-sm w-100"
+                  >
+                    <i class="fas fa-shopping-bag me-2"></i>
+                    Shop Now
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <!-- Category Badge -->
+            <div class="category-badge">
+              <span class="badge bg-primary">Featured</span>
+            </div>
+          </div>
+        </div>
+        <% }) %>
+      </div>
+
+      <!-- Load More Button -->
+      <div class="text-center mt-5" id="loadMoreSection" style="display: none">
+        <button class="btn btn-outline-primary btn-lg" id="loadMoreBtn">
+          <i class="fas fa-plus me-2"></i>
+          Load More Categories
+        </button>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</section>
+
+<!-- Featured Categories Section -->
+<section class="py-5 bg-light">
+  <div class="container">
+    <div class="row">
+      <div class="col-12">
+        <h2 class="section-title text-center mb-5">
+          <i class="fas fa-star text-warning me-3"></i>
+          Featured Categories
+        </h2>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <% const featuredCategories = categories.slice(0, 3); %>
+      <div hidden="true"></div>
+      <% featuredCategories.forEach((category) => { %>
+      <div class="col-lg-4 col-md-6">
+        <div class="card featured-card border-0 shadow-sm h-100">
+          <div class="card-body text-center p-4">
+            <div class="featured-icon mb-3">
+              <i class="fas <%= category.icon_class || 'fa-star' %>"></i>
+            </div>
+            <h5 class="card-title mb-3"><%= category.main_category %></h5>
+            <p class="card-text text-muted mb-4">
+              <%= category.description || 'Discover amazing products' %>
+            </p>
+            <a href="/categories/<%= category.id %>" class="btn btn-warning">
+              Explore Now
+            </a>
+          </div>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  </div>
+</section>
+
+<!-- Newsletter Section -->
+<section class="py-5 bg-primary text-white">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-8">
+        <h3 class="mb-3">
+          <i class="fas fa-envelope me-3"></i>
+          Stay Updated
+        </h3>
+        <p class="mb-0">
+          Get notified about new categories and exclusive offers. Subscribe to
+          our newsletter!
+        </p>
+      </div>
+      <div class="col-lg-4">
+        <div class="input-group">
+          <input
+            type="email"
+            class="form-control"
+            placeholder="Enter your email"
+          />
+          <button class="btn btn-warning" type="button">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- External CSS and JS Files -->
+<link rel="stylesheet" href="/css/categories.css" />
+<script src="/js/categories.js"></script>

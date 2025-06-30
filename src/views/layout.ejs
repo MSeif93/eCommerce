@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/images/logo.png" type="image/png" />
+    <title><%= title %> | eCommerce</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="/css/style.css" />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body
+    class="d-flex flex-column min-vh-100 bg-light"
+    data-icons='<%- typeof allIcons !== "undefined" ? JSON.stringify(allIcons) : "[]" %>'
+    data-error="<%= typeof flashError !== 'undefined' ? flashError : '' %>"
+    data-success="<%= typeof flashSuccess !== 'undefined' ? flashSuccess : '' %>"
+  >
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container">
+        <a class="navbar-brand fw-bold" href="/">
+          <i class="fas fa-shopping-bag me-2"></i>
+          eCommerce
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#mainNav"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="fas fa-home me-1"></i>
+                Home
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#products">
+                <i class="fas fa-tags me-1"></i>
+                Products
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#categories">
+                <i class="fas fa-th-large me-1"></i>
+                Categories
+              </a>
+            </li>
+          </ul>
+          <ul class="navbar-nav">
+            <% if (typeof user === 'undefined' || !user) { %>
+            <li class="nav-item">
+              <a class="nav-link" href="/cart">
+                <i class="fas fa-shopping-cart me-1"></i>
+                Cart
+                <span class="badge bg-primary ms-1">0</span>
+              </a>
+            </li>
+            <% } %>
+            <li class="nav-item">
+              <% if (typeof user !== 'undefined' && user) { %>
+              <a class="nav-link" href="/dashboard">
+                <i class="fas fa-tachometer-alt me-1"></i>
+                Admin Dashboard <% if (pendingOrders > 0) { %>
+                <span class="badge bg-warning ms-2"><%= pendingOrders %></span>
+                <% } %>
+              </a>
+              <% } else { %>
+              <a class="nav-link" href="/login">
+                <i class="fas fa-user-shield me-1"></i>
+                Admin Login
+              </a>
+              <% } %>
+            </li>
+            <% if (typeof user !== 'undefined' && user) { %>
+            <li class="nav-item">
+              <a class="nav-link" href="/logout">
+                <i class="fas fa-sign-out-alt me-1"></i>
+                Logout
+              </a>
+            </li>
+            <% } %>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow-1">
+      <div class="container py-4"><%- body %></div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white text-center py-3 mt-auto">
+      <div class="container">
+        <p class="mb-2">
+          &copy; <%= new Date().getFullYear() %> eCommerce Admin System. All
+          rights reserved.
+        </p>
+        <small class="text-muted">
+          <i class="fas fa-shield-alt me-1"></i>
+          Admin-managed platform
+        </small>
+      </div>
+    </footer>
+
+    <script src="/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/main.js"></script>
+  </body>
+</html>

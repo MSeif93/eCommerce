@@ -1,0 +1,219 @@
+<% title = 'Home' %>
+
+<!-- Hero Section -->
+<section class="hero-section">
+  <div class="container">
+    <div class="row align-items-center mx-1">
+      <div class="col-lg-6">
+        <div class="hero-content">
+          <h1 class="hero-title">Discover Amazing Electronics</h1>
+          <p class="hero-subtitle">
+            Shop the latest electronics with premium quality products at
+            unbeatable prices. Fast shipping and excellent customer service
+            guaranteed.
+          </p>
+          <a href="#products" class="btn cta-button">
+            <i class="fas fa-shopping-bag me-2"></i>
+            Shop Now
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stats Section -->
+<section class="stats-section">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-3 col-6 mb-4">
+        <div class="stat-item">
+          <div class="stat-number">10000+</div>
+          <div class="stat-label">Happy Customers</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6 mb-4">
+        <div class="stat-item">
+          <div class="stat-number">500+</div>
+          <div class="stat-label">Products</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6 mb-4">
+        <div class="stat-item">
+          <div class="stat-number" data-no-animate="true">24/7</div>
+          <div class="stat-label">Support</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6 mb-4">
+        <div class="stat-item">
+          <div class="stat-number">25+</div>
+          <div class="stat-label">Categories</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Categories Section -->
+<section id="categories" class="categories-section">
+  <div class="container">
+    <h2 class="section-title">Shop by Category</h2>
+    <div class="row g-4">
+      <% if (categories.length === 0) { %>
+      <div class="text-center py-5">
+        <i
+          class="fas fa-box-open"
+          style="font-size: 4rem; color: #ccc; margin-bottom: 1rem"
+        ></i>
+        <h3 class="text-muted">No categories available</h3>
+        <p class="text-muted">Check back soon for new categories!</p>
+      </div>
+      <% } else { %> <% categories.forEach(category => { %>
+      <div class="col-lg-4 col-md-6">
+        <div class="card category-card">
+          <div class="category-icon">
+            <i class="fas <%= category.icon_class %>"></i>
+          </div>
+          <h4><%= category.main_category %></h4>
+          <p class="text-muted"><%= category.description %></p>
+        </div>
+      </div>
+      <% }) %> <% } %>
+
+      <!-- <div class="col-lg-4 col-md-6">
+        <div class="card category-card">
+          <div class="category-icon">
+            <i class="fas fa-mobile-alt"></i>
+          </div>
+          <h4>Mobile & Tablets</h4>
+          <p class="text-muted">Smartphones, tablets, and mobile accessories</p>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6">
+        <div class="card category-card">
+          <div class="category-icon">
+            <i class="fas fa-tv"></i>
+          </div>
+          <h4>TV - Audio - Video</h4>
+          <p class="text-muted">
+            Televisions, speakers, and home entertainment
+          </p>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6">
+        <div class="card category-card">
+          <div class="category-icon">
+            <i class="fas fa-laptop"></i>
+          </div>
+          <h4>Computers - Accessories</h4>
+          <p class="text-muted">Laptops, desktops, and computer peripherals</p>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6">
+        <div class="card category-card">
+          <div class="category-icon">
+            <i class="fas fa-gamepad"></i>
+          </div>
+          <h4>Video Games - Consoles</h4>
+          <p class="text-muted">Gaming consoles, games, and accessories</p>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6">
+        <div class="card category-card">
+          <div class="category-icon">
+            <i class="fas fa-camera"></i>
+          </div>
+          <h4>Cameras - Imaging</h4>
+          <p class="text-muted">
+            Digital cameras, lenses, and photography gear
+          </p>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6">
+        <div class="card category-card">
+          <div class="category-icon">
+            <i class="fas fa-blender"></i>
+          </div>
+          <h4>Home Appliances</h4>
+          <p class="text-muted">Kitchen appliances and home electronics</p>
+        </div>
+      </div> -->
+    </div>
+  </div>
+</section>
+
+<!-- Featured Products Section -->
+<section id="products" class="py-5">
+  <div class="container">
+    <h2 class="section-title">Featured Products</h2>
+    <div class="row g-4">
+      <% products.forEach(product => { %>
+      <div class="col-lg-3 col-md-6 col-sm-6">
+        <div class="card product-card">
+          <img
+            src="/uploads/<%= product.image %>"
+            class="product-image"
+            alt="<%= product.name %>"
+          />
+          <div class="product-info">
+            <h5 class="product-title"><%= product.name %></h5>
+            <div class="product-price">$<%= product.price %></div>
+            <a href="/products/<%= product.id %>" class="btn view-details-btn">
+              <i class="fas fa-eye me-2"></i>
+              View Details
+            </a>
+          </div>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+
+    <% if (products.length === 0) { %>
+    <div class="text-center py-5">
+      <i
+        class="fas fa-box-open"
+        style="font-size: 4rem; color: #ccc; margin-bottom: 1rem"
+      ></i>
+      <h3 class="text-muted">No products available</h3>
+      <p class="text-muted">Check back soon for new arrivals!</p>
+    </div>
+    <% } %>
+  </div>
+</section>
+
+<!-- Features Section -->
+<section class="py-5 bg-light">
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-lg-4 col-md-6">
+        <div class="text-center">
+          <div class="category-icon mb-3">
+            <i class="fas fa-shipping-fast"></i>
+          </div>
+          <h4>Fast Shipping</h4>
+          <p class="text-muted">Free shipping on orders over 100K EGP</p>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6">
+        <div class="text-center">
+          <div class="category-icon mb-3">
+            <i class="fas fa-shield-alt"></i>
+          </div>
+          <h4>Secure Payment</h4>
+          <p class="text-muted">
+            100% secure payment processing with Visa, MasterCard, and EGP
+          </p>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6">
+        <div class="text-center">
+          <div class="category-icon mb-3">
+            <i class="fas fa-undo"></i>
+          </div>
+          <h4>Easy Returns</h4>
+          <p class="text-muted">30-day return policy</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

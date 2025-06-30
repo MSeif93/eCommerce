@@ -1,0 +1,355 @@
+<% title = 'Admin Dashboard' %>
+
+<div class="container-fluid mt-4">
+  <!-- Header Section -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h1 class="h2 mb-0">
+            <i class="fas fa-tachometer-alt text-primary me-2"></i>
+            Admin Dashboard
+          </h1>
+          <p class="text-muted mb-0">Welcome back, <%= user.name %></p>
+        </div>
+        <div class="d-flex align-items-center">
+          <% if (user.role === 'superadmin') { %>
+          <span class="badge bg-success fs-6 me-3">
+            <i class="fas fa-crown me-1"></i>Superadmin
+          </span>
+          <% } %>
+          <span class="badge bg-primary fs-6">
+            <i class="fas fa-user me-1"></i><%= user.email %>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-shrink-0">
+              <div class="bg-primary bg-gradient rounded-circle p-3">
+                <i class="fas fa-box text-white fs-4"></i>
+              </div>
+            </div>
+            <div class="flex-grow-1 ms-3">
+              <h6 class="card-title text-muted mb-1">Total Products</h6>
+              <h3 class="mb-0 fw-bold text-primary">
+                <%= summary.totalProducts %>
+              </h3>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-shrink-0">
+              <div class="bg-success bg-gradient rounded-circle p-3">
+                <i class="fas fa-chart-line text-white fs-4"></i>
+              </div>
+            </div>
+            <div class="flex-grow-1 ms-3">
+              <h6 class="card-title text-muted mb-1">Monthly Sales</h6>
+              <h3 class="mb-0 fw-bold text-success">
+                <%= summary.monthlySales %>
+              </h3>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-shrink-0">
+              <div class="bg-warning bg-gradient rounded-circle p-3">
+                <i class="fas fa-exclamation-triangle text-white fs-4"></i>
+              </div>
+            </div>
+            <div class="flex-grow-1 ms-3">
+              <h6 class="card-title text-muted mb-1">Low Stock</h6>
+              <h3 class="mb-0 fw-bold text-warning"><%= summary.lowStock %></h3>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-shrink-0">
+              <div class="bg-info bg-gradient rounded-circle p-3">
+                <i class="fas fa-shopping-cart text-white fs-4"></i>
+              </div>
+            </div>
+            <div class="flex-grow-1 ms-3">
+              <h6 class="card-title text-muted mb-1">Total Orders</h6>
+              <h3 class="mb-0 fw-bold text-info"><%= summary.totalOrders %></h3>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Row -->
+  <div class="row">
+    <!-- Left Column -->
+    <div class="col-lg-8">
+      <!-- Sales Chart -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0">
+          <h5 class="mb-0">
+            <i class="fas fa-chart-area text-primary me-2"></i>
+            Sales Overview
+          </h5>
+        </div>
+        <div class="card-body">
+          <canvas
+            id="salesChart"
+            height="100"
+            data-labels="<%- JSON.stringify(sales.labels) %>"
+            data-sales="<%- JSON.stringify(sales.data) %>"
+          ></canvas>
+        </div>
+      </div>
+
+      <!-- Low Stock Products -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0">
+          <h5 class="mb-0">
+            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+            Low Stock Products
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (lowStockProducts.length === 0) { %>
+          <div class="text-center py-4">
+            <i class="fas fa-check-circle text-success fs-1 mb-3"></i>
+            <p class="text-muted mb-0">All products are well stocked!</p>
+          </div>
+          <% } else { %>
+          <div class="table-responsive">
+            <table class="table">
+              <thead class="table-light">
+                <tr>
+                  <th>Product Name</th>
+                  <th>Stock</th>
+                  <th>Category</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% lowStockProducts.forEach(p => { %>
+                <tr>
+                  <td><%= p.name %></td>
+                  <td>
+                    <span class="badge bg-danger"><%= p.stock %></span>
+                  </td>
+                  <td><%= p.main_category %> / <%= p.sub_category %></td>
+                  <td>
+                    <a
+                      href="/admin/products/edit/<%= p.id %>"
+                      class="btn btn-sm btn-outline-primary"
+                    >
+                      <i class="fas fa-edit me-1"></i>Update
+                    </a>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Categories List -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0">
+          <h5 class="mb-0">
+            <i class="fas fa-tags text-info me-2"></i>
+            Categories List
+          </h5>
+        </div>
+        <div class="card-body">
+          <!-- Categories Table -->
+          <div
+            class="table-responsive"
+            style="max-height: 350px; overflow-y: auto"
+          >
+            <table class="table">
+              <thead
+                class="table-light"
+                style="position: sticky; top: 0; z-index: 2; background: #fff"
+              >
+                <tr>
+                  <th>Main Category</th>
+                  <th>Sub Category</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% categories.forEach((cat) => { %>
+                <div hidden="true"></div>
+                <% if (cat.subcategories.length > 0) { %>
+                <div hidden="true"></div>
+                <% cat.subcategories.forEach((subcat, subIdx) => { %>
+                <tr>
+                  <% if (subIdx === 0) { %>
+                  <td rowspan="<%= cat.subcategories.length %>">
+                    <%= cat.main_category %>
+                  </td>
+                  <% } %>
+                  <td><%= subcat %></td>
+                </tr>
+                <% }) %> <% } else { %>
+                <tr>
+                  <td><%= cat.main_category %></td>
+                  <td class="text-muted">No subcategory</td>
+                </tr>
+                <% } %> <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shipping Prices -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0">
+          <h5 class="mb-0">
+            <i class="fas fa-truck text-warning me-2"></i>
+            Shipping Prices
+          </h5>
+        </div>
+        <div class="card-body">
+          <!-- Shipping Table -->
+          <div
+            class="table-responsive"
+            style="max-height: 350px; overflow-y: auto"
+          >
+            <table class="table">
+              <thead
+                class="table-light"
+                style="position: sticky; top: 0; z-index: 2; background: #fff"
+              >
+                <tr>
+                  <th>#</th>
+                  <th>City</th>
+                  <th>Shipping Price (EGP)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% shippingOptions.forEach((s, i) => { %>
+                <tr>
+                  <td><%= i + 1 %></td>
+                  <td><%= s.name %></td>
+                  <td><strong><%= s.price %></strong></td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column -->
+    <div class="col-lg-4">
+      <!-- Quick Actions -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0">
+          <h5 class="mb-0">
+            <i class="fas fa-bolt text-primary me-2"></i>
+            Quick Actions
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="d-grid gap-2">
+            <% if (summary.pendingOrders > 0) { %>
+            <a href="/admin/orders/pending" class="btn btn-warning">
+              <i class="fas fa-clock me-2"></i>Pending Orders
+              <span class="badge bg-light text-dark ms-2"
+                ><%= summary.pendingOrders %></span
+              >
+            </a>
+            <% } %>
+            <a href="/admin/products/add" class="btn btn-primary">
+              <i class="fas fa-plus me-2"></i>Add New Product
+            </a>
+            <a href="/admin/products" class="btn btn-outline-primary">
+              <i class="fas fa-box me-2"></i>View All Products
+            </a>
+            <a href="/admin/orders" class="btn btn-outline-success">
+              <i class="fas fa-shopping-cart me-2"></i>View Orders
+            </a>
+            <a href="/admin/reviews" class="btn btn-outline-warning">
+              <i class="fas fa-star me-2"></i>View Reviews
+            </a>
+
+            <% if (user.role === 'superadmin') { %>
+            <hr class="my-2" />
+            <h6 class="text-muted mb-2">Superadmin Actions</h6>
+            <a href="/admin/categories" class="btn btn-outline-info">
+              <i class="fas fa-tags me-2"></i>Manage Categories
+            </a>
+            <a href="/admin/shipping" class="btn btn-outline-warning">
+              <i class="fas fa-truck me-2"></i>Manage Shipping
+            </a>
+            <a href="/admin/admins" class="btn btn-outline-success">
+              <i class="fas fa-users-cog me-2"></i>Manage Admins
+            </a>
+            <a href="/admin/discounts" class="btn btn-outline-danger">
+              <i class="fas fa-percent me-2"></i>Manage Discounts
+            </a>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admins List -->
+      <% if (user.role === 'superadmin') { %>
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0">
+          <h5 class="mb-0">
+            <i class="fas fa-users-cog text-success me-2"></i>
+            Admins List
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="list-group list-group-flush">
+            <% admins.forEach((a, i) => { %>
+            <div
+              class="list-group-item d-flex justify-content-between align-items-center px-0"
+            >
+              <div>
+                <h6 class="mb-1"><%= a.name %></h6>
+                <small class="text-muted"><%= a.email %></small>
+              </div>
+              <div class="d-flex align-items-center">
+                <% if (a.role === 'superadmin') { %>
+                <span class="badge bg-success me-2">Super</span>
+                <% } %>
+              </div>
+            </div>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<script src="/js/chart.min.js"></script>
+<script src="/js/dashboard.js"></script>

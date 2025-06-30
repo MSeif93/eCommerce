@@ -1,0 +1,169 @@
+<% title = 'Manage Shipping Options' %>
+
+<!-- Alert Container - Top Right -->
+<div
+  id="alertContainer"
+  style="
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 400px;
+  "
+></div>
+
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0">
+          <h3 class="mb-0">
+            <i class="fas fa-truck text-primary me-2"></i>
+            Manage Shipping Options
+          </h3>
+        </div>
+        <div class="card-body">
+          <% if (user && user.role === 'superadmin') { %>
+          <!-- Add/Edit Shipping Option Form -->
+          <form
+            action="/admin/shipping/add"
+            method="POST"
+            class="row g-3 mb-4"
+            id="shippingForm"
+          >
+            <input type="hidden" id="editId" name="edit_id" value="" />
+            <div class="col-md-6">
+              <label for="cityName" class="form-label">City Name</label>
+              <input
+                type="text"
+                class="form-control"
+                id="cityName"
+                name="name"
+                required
+              />
+            </div>
+            <div class="col-md-6">
+              <label for="shippingPrice" class="form-label"
+                >Shipping Price (EGP)</label
+              >
+              <input
+                type="number"
+                class="form-control"
+                id="shippingPrice"
+                name="price"
+                min="0"
+                step="1"
+                required
+              />
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button type="submit" class="btn btn-primary" id="submitBtn">
+                <i class="fas fa-plus me-2"></i>Add Shipping Option
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                id="cancelBtn"
+                style="display: none"
+              >
+                <i class="fas fa-times me-2"></i>Cancel Edit
+              </button>
+            </div>
+          </form>
+          <% } %>
+
+          <!-- Shipping Options Table -->
+          <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th>
+                  <th>City</th>
+                  <th>Shipping Price (EGP)</th>
+                  <% if (user && user.role === 'superadmin') { %>
+                  <th>Actions</th>
+                  <% } %>
+                </tr>
+              </thead>
+              <tbody>
+                <% shippingOptions.forEach((option, i) => { %>
+                <tr>
+                  <td><%= i + 1 %></td>
+                  <td><%= option.name %></td>
+                  <td><%= option.price %></td>
+                  <% if (user && user.role === 'superadmin') { %>
+                  <td>
+                    <form
+                      action="/admin/shipping/delete/<%= option.id %>"
+                      method="POST"
+                      style="display: inline-block"
+                      class="delete-shipping-form"
+                    >
+                      <button
+                        type="submit"
+                        class="btn btn-sm btn-danger delete-shipping-btn"
+                        data-shipping-name="<%= option.name %>"
+                      >
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </form>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-secondary ms-1 edit-shipping-btn"
+                      data-id="<%= option.id %>"
+                      data-name="<%= option.name %>"
+                      data-price="<%= option.price %>"
+                    >
+                      <i class="fas fa-edit"></i>
+                    </button>
+                  </td>
+                  <% } %>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div
+  class="modal fade"
+  id="deleteConfirmModal"
+  tabindex="-1"
+  aria-labelledby="deleteConfirmModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteConfirmModalLabel">
+          <i class="fas fa-exclamation-triangle me-2"></i>Confirm Deletion
+        </h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <span id="deleteModalMessage"></span>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          Cancel
+        </button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- External JavaScript -->
+<script src="/js/adminShipping.js"></script>

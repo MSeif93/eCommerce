@@ -1,0 +1,67 @@
+<div id="product-table" class="table-responsive">
+  <table class="table table-bordered table-striped">
+    <thead>
+      <tr>
+        <th>
+          <a href="#" class="sort-link" data-sort="main_category"
+            >Main Category</a
+          >
+        </th>
+        <th>
+          <a href="#" class="sort-link" data-sort="sub_category"
+            >Sub Category</a
+          >
+        </th>
+        <th><a href="#" class="sort-link" data-sort="name">Product Name</a></th>
+        <th>Main Image</th>
+        <th>Description</th>
+        <th><a href="#" class="sort-link" data-sort="price">Price</a></th>
+        <th><a href="#" class="sort-link" data-sort="stock">Stock</a></th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% products.forEach(p => { %>
+      <tr>
+        <td><%= p.main_category %></td>
+        <td><%= p.sub_category %></td>
+        <td><%= p.name %></td>
+        <td>
+          <img
+            src="/uploads/<%= p.main_image %>"
+            style="width: 80px; height: auto"
+          />
+        </td>
+        <td><%= p.description %></td>
+        <td><%= p.price.toFixed(2) %></td>
+        <td><%= p.stock %></td>
+        <td>
+          <a
+            href="/admin/products/edit/<%= p.id %>"
+            class="btn btn-sm btn-secondary"
+            >Edit</a
+          >
+          <form
+            action="/admin/products/delete/<%= p.id %>"
+            method="POST"
+            style="display: inline-block"
+            onsubmit="return confirm('Are you sure?');"
+          >
+            <button class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<nav>
+  <ul id="pagination" class="pagination">
+    <% for (let i = 1; i <= totalPages; i++) { %>
+    <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+      <a class="page-link" href="#" data-page="<%= i %>"><%= i %></a>
+    </li>
+    <% } %>
+  </ul>
+</nav>
