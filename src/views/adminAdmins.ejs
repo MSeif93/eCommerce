@@ -1,0 +1,239 @@
+<% title = 'Admin Management' %>
+
+<!-- External CSS and JS -->
+<link rel="stylesheet" href="/css/adminAdmins.css" />
+<link rel="stylesheet" href="/css/toast.css" />
+<script src="/js/passwordToggle.js" defer></script>
+<script src="/js/adminAdmins.js" defer></script>
+<script src="/js/toast.js" defer></script>
+
+<!-- Flash Messages Meta Tags -->
+<% if (success) { %>
+<meta name="flash-success" content="<%= success %>" />
+<% } %> <% if (error) { %>
+<meta name="flash-error" content="<%= error %>" />
+<% } %>
+
+<div class="container-fluid mt-4">
+  <!-- Header Section -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h1 class="h2 mb-0">
+            <i class="fas fa-users-cog text-primary me-2"></i>
+            Admin Management
+          </h1>
+          <p class="text-muted mb-0">
+            Manage system administrators and their permissions
+          </p>
+        </div>
+        <div class="d-flex align-items-center">
+          <span class="badge bg-success fs-6 me-3">
+            <i class="fas fa-crown me-1"></i>Superadmin Access
+          </span>
+          <a href="/dashboard" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Admin Form -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-0">
+      <h5 class="mb-0">
+        <i class="fas fa-user-plus text-success me-2"></i>
+        Add New Admin
+      </h5>
+    </div>
+    <div class="card-body">
+      <form action="/admin/admins/add" method="POST" class="row g-3">
+        <div class="col-md-6">
+          <label for="adminName" class="form-label">Full Name</label>
+          <input
+            type="text"
+            class="form-control"
+            id="adminName"
+            name="name"
+            required
+            placeholder="Enter admin's full name"
+          />
+        </div>
+        <div class="col-md-6">
+          <label for="adminEmail" class="form-label">Email Address</label>
+          <input
+            type="email"
+            class="form-control"
+            id="adminEmail"
+            name="email"
+            required
+            placeholder="Enter admin's email"
+          />
+        </div>
+        <div class="col-md-6">
+          <label for="adminPassword" class="form-label">Password</label>
+          <div class="input-group">
+            <input
+              type="password"
+              class="form-control"
+              id="adminPassword"
+              name="password"
+              required
+              placeholder="Enter secure password"
+              minlength="6"
+            />
+            <button
+              class="btn btn-outline-secondary"
+              type="button"
+              id="togglePassword"
+              title="Show/Hide Password"
+            >
+              <i class="fas fa-eye" id="passwordIcon"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <label for="adminRole" class="form-label">Role</label>
+          <select class="form-select" id="adminRole" name="role" required>
+            <option value="admin">Admin</option>
+            <option value="superadmin">Superadmin</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-success">
+            <i class="fas fa-user-plus me-2"></i>
+            Create Admin
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admins List -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0">
+      <h5 class="mb-0">
+        <i class="fas fa-users text-info me-2"></i>
+        All Admins (<%= admins.length %>)
+      </h5>
+    </div>
+    <div class="card-body p-0">
+      <% if (admins.length === 0) { %>
+      <div class="text-center py-5">
+        <div class="text-muted">
+          <i class="fas fa-users fs-1 mb-3 d-block"></i>
+          <h5>No Admins Found</h5>
+          <p>Start by adding your first admin user</p>
+        </div>
+      </div>
+      <% } else { %>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% admins.forEach((a, index) => { %>
+            <tr>
+              <td><%= index + 1 %></td>
+              <td>
+                <div class="d-flex align-items-center">
+                  <div class="avatar-sm me-3">
+                    <div
+                      class="avatar-initial rounded-circle bg-primary text-white"
+                    >
+                      <%= a.name.charAt(0).toUpperCase() %>
+                    </div>
+                  </div>
+                  <div>
+                    <h6 class="mb-0 fw-bold"><%= a.name %></h6>
+                    <% if (a.id === user.id) { %>
+                    <small class="text-muted">(Current User)</small>
+                    <% } %>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="text-muted"><%= a.email %></span>
+              </td>
+              <td>
+                <% if (a.role === 'superadmin') { %>
+                <span class="badge bg-success">
+                  <i class="fas fa-crown me-1"></i>Superadmin
+                </span>
+                <% } else { %>
+                <span class="badge bg-primary">
+                  <i class="fas fa-user me-1"></i>Admin
+                </span>
+                <% } %>
+              </td>
+              <td>
+                <small class="text-muted">
+                  <%= new Date(a.created_at).toLocaleDateString() %>
+                </small>
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <a
+                    href="/admin/admins/edit/<%= a.id %>"
+                    class="btn btn-sm btn-outline-secondary"
+                    title="Edit Admin"
+                  >
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  <% if (a.id !== user.id && a.role !== 'superadmin') { %>
+                  <form
+                    action="/admin/admins/delete/<%= a.id %>"
+                    method="POST"
+                    style="display: inline-block"
+                    class="delete-admin-form"
+                    data-admin-name="<%= a.name %>"
+                  >
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-danger"
+                      title="Delete Admin"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </form>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Custom Confirm Modal -->
+<div id="customConfirmModal" class="custom-modal-overlay" style="display: none">
+  <div class="custom-modal">
+    <div class="custom-modal-header">
+      <span class="custom-modal-title"
+        ><i class="fas fa-exclamation-triangle text-danger me-2"></i>Confirm
+        Deletion</span
+      >
+    </div>
+    <div class="custom-modal-body">
+      <span id="customConfirmMessage">Are you sure?</span>
+    </div>
+    <div class="custom-modal-footer">
+      <button id="customConfirmOk" class="btn btn-danger me-2">Delete</button>
+      <button id="customConfirmCancel" class="btn btn-secondary">Cancel</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,177 @@
+<% title = 'Add Product' %>
+
+<link rel="stylesheet" href="/css/adminAdmins.css" />
+<link rel="stylesheet" href="/css/toast.css" />
+<script src="/js/toast.js" defer></script>
+
+<% if (success && success.length > 0) { %>
+<meta name="flash-success" content="<%= success %>" />
+<% } %> <% if (error && error.length > 0) { %>
+<meta name="flash-error" content="<%= error %>" />
+<% } %>
+
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-0">
+          <h4 class="mb-0">
+            <i class="fas fa-plus text-primary me-2"></i>
+            Add New Product
+          </h4>
+        </div>
+        <div class="card-body">
+          <form
+            action="/admin/products/add"
+            method="POST"
+            enctype="multipart/form-data"
+            class="row g-3"
+          >
+            <div class="col-md-6">
+              <label for="name" class="form-label">Product Name</label>
+              <input
+                type="text"
+                class="form-control"
+                id="name"
+                name="name"
+                required
+              />
+            </div>
+            <div class="col-md-6">
+              <label for="cost" class="form-label">Cost (EGP)</label>
+              <input
+                type="number"
+                class="form-control"
+                id="cost"
+                name="cost"
+                min="0"
+                step="0.01"
+                required
+                placeholder="Enter product cost"
+              />
+              <small class="text-muted"
+                >The cost to purchase/manufacture this product</small
+              >
+            </div>
+            <div class="col-md-6">
+              <label for="price" class="form-label">Price (EGP)</label>
+              <input
+                type="number"
+                class="form-control"
+                id="price"
+                name="price"
+                min="0"
+                step="0.01"
+                required
+                placeholder="Enter selling price"
+              />
+              <small class="text-muted"
+                >The price customers will pay for this product</small
+              >
+              <div id="profit-info" class="mt-2 d-none">
+                <small>
+                  <i class="fas fa-chart-line me-1"></i>
+                  <span id="profit-label">Profit</span>:
+                  <span id="profit-amount">0</span> EGP (<span
+                    id="profit-percentage"
+                    >0</span
+                  >%)
+                </small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label for="stock" class="form-label">Stock</label>
+              <input
+                type="number"
+                class="form-control"
+                id="stock"
+                name="stock"
+                min="0"
+                required
+                placeholder="Enter stock quantity"
+              />
+            </div>
+            <div class="col-md-6">
+              <label for="category_id" class="form-label">Category</label>
+              <select
+                class="form-select"
+                id="category_id"
+                name="category_id"
+                required
+              >
+                <option value="">Select Category</option>
+                <% const showCategories = typeof categories !== 'undefined' &&
+                categories.length > 0 %>
+                <!-- just a break note -->
+                <% if (showCategories) { %>
+                <!-- just a break note -->
+                <% categories.forEach(cat => { %>
+                <option value="<%= cat.id %>"><%= cat.main_category %></option>
+                <% }) %> <% } %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="sub_category" class="form-label">Subcategory</label>
+              <select
+                class="form-select"
+                id="sub_category"
+                name="sub_category"
+                required
+                disabled
+              >
+                <option value="">Select Subcategory</option>
+                <!-- Subcategories will be populated via JavaScript -->
+              </select>
+            </div>
+            <div class="col-12">
+              <label for="description" class="form-label">Description</label>
+              <textarea
+                class="form-control"
+                id="description"
+                name="description"
+                rows="3"
+              ></textarea>
+            </div>
+            <div class="col-12">
+              <label for="main_image" class="form-label"
+                >Main Image <span class="text-danger">*</span></label
+              >
+              <input
+                type="file"
+                class="form-control"
+                id="main_image"
+                name="main_image"
+                accept="image/*"
+                required
+              />
+            </div>
+            <div class="col-12">
+              <label for="additional_images" class="form-label"
+                >Additional Images (up to 4)</label
+              >
+              <input
+                type="file"
+                class="form-control"
+                id="additional_images"
+                name="additional_images"
+                accept="image/*"
+                multiple
+              />
+              <small class="text-muted">You can select up to 4 images.</small>
+            </div>
+            <div class="col-12 d-flex justify-content-end gap-2">
+              <a href="/admin/products" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Cancel
+              </a>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Add Product
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/addProduct.js" defer></script>

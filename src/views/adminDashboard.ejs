@@ -38,9 +38,9 @@
               </div>
             </div>
             <div class="flex-grow-1 ms-3">
-              <h6 class="card-title text-muted mb-1">Total Products</h6>
+              <h6 class="card-title text-muted mb-1">Active Products</h6>
               <h3 class="mb-0 fw-bold text-primary">
-                <%= summary.totalProducts %>
+                <%= summary.totalActiveProducts %>
               </h3>
             </div>
           </div>
@@ -200,9 +200,9 @@
               </thead>
               <tbody>
                 <% categories.forEach((cat) => { %>
-                <div hidden="true"></div>
+                <!-- just a break note -->
                 <% if (cat.subcategories.length > 0) { %>
-                <div hidden="true"></div>
+                <!-- just a break note -->
                 <% cat.subcategories.forEach((subcat, subIdx) => { %>
                 <tr>
                   <% if (subIdx === 0) { %>

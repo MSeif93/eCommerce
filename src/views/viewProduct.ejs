@@ -1,0 +1,209 @@
+<% title = 'View Product' %>
+
+<div class="container py-4">
+  <div class="row">
+    <div class="col-12">
+      <!-- Header -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 class="mb-1">
+            <i class="fas fa-eye text-primary me-2"></i>
+            Product Details
+          </h2>
+          <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+              <li class="breadcrumb-item">
+                <a href="/admin/products">Products</a>
+              </li>
+              <li class="breadcrumb-item active" aria-current="page">
+                <%= product.name %>
+              </li>
+            </ol>
+          </nav>
+        </div>
+        <div>
+          <a
+            href="/admin/products/edit/<%= product.id %>"
+            class="btn btn-primary me-2"
+          >
+            <i class="fas fa-edit me-2"></i>Edit Product
+          </a>
+          <a href="/admin/products" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Products
+          </a>
+        </div>
+      </div>
+
+      <!-- Product Details Card -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="row">
+            <!-- Product Images -->
+            <div class="col-md-6 mb-4">
+              <div class="product-images">
+                <% if (images && images.length > 0) { %>
+                <div class="main-image mb-3">
+                  <img
+                    src="/uploads/<%= images[0].image_url %>"
+                    alt="<%= product.name %>"
+                    class="img-fluid rounded"
+                    style="max-height: 400px; width: 100%; object-fit: cover"
+                  />
+                </div>
+                <% if (images.length > 1) { %>
+                <div class="thumbnail-images d-flex gap-2">
+                  <% images.forEach(image => { %>
+                  <img
+                    src="/uploads/<%= image.image_url %>"
+                    alt="<%= product.name %>"
+                    class="img-thumbnail"
+                    style="
+                      width: 80px;
+                      height: 80px;
+                      object-fit: cover;
+                      cursor: pointer;
+                    "
+                    onclick="changeMainImage(this.src)"
+                  />
+                  <% }) %>
+                </div>
+                <% } %> <% } else { %>
+                <div class="text-center py-5">
+                  <i
+                    class="fas fa-image text-muted mb-3"
+                    style="font-size: 4rem"
+                  ></i>
+                  <p class="text-muted">No images available</p>
+                </div>
+                <% } %>
+              </div>
+            </div>
+
+            <!-- Product Information -->
+            <div class="col-md-6">
+              <h3 class="mb-3"><%= product.name %></h3>
+
+              <div class="row mb-3">
+                <div class="col-6">
+                  <strong>Category:</strong>
+                  <p class="text-muted mb-1">
+                    <%= product.category_name || 'N/A' %>
+                  </p>
+                </div>
+                <div class="col-6">
+                  <strong>Subcategory:</strong>
+                  <p class="text-muted mb-1">
+                    <%= product.subcategory_name || 'N/A' %>
+                  </p>
+                </div>
+              </div>
+
+              <div class="row mb-3">
+                <div class="col-6">
+                  <strong>Stock:</strong>
+                  <p class="mb-1">
+                    <% if (product.stock <= 5 && product.stock > 0) { %>
+                    <span class="badge bg-warning text-dark"
+                      ><%= product.stock %></span
+                    >
+                    <% } else if (product.stock === 0) { %>
+                    <span class="badge bg-danger">Out of Stock</span>
+                    <% } else { %>
+                    <span class="badge bg-success"><%= product.stock %></span>
+                    <% } %>
+                  </p>
+                </div>
+                <div class="col-6">
+                  <strong>Status:</strong>
+                  <p class="mb-1">
+                    <% if (product.is_active) { %>
+                    <span class="badge bg-success">Active</span>
+                    <% } else { %>
+                    <span class="badge bg-secondary">Inactive</span>
+                    <% } %>
+                  </p>
+                </div>
+              </div>
+
+              <div class="row mb-3">
+                <div class="col-6">
+                  <strong>Cost:</strong>
+                  <p class="text-muted mb-1">
+                    <%= product.cost ? product.cost.toFixed(2) : 'N/A' %> EGP
+                  </p>
+                </div>
+                <div class="col-6">
+                  <strong>Price:</strong>
+                  <p class="text-muted mb-1">
+                    <%= product.price ? product.price.toFixed(2) : 'N/A' %> EGP
+                  </p>
+                </div>
+              </div>
+
+              <% if (product.cost && product.price) { %>
+              <div class="mb-3">
+                <strong>Profit Analysis:</strong>
+                <% const profit = product.price - product.cost; %> <% const
+                profitPercent = product.cost > 0 ? (profit / product.cost) * 100
+                : 0; %>
+                <p class="mb-1">
+                  <% if (profit > 0) { %>
+                  <span class="text-success">
+                    <i class="fas fa-arrow-up me-1"></i>
+                    Profit: <%= profit.toFixed(2) %> EGP (<%=
+                    profitPercent.toFixed(1) %>%)
+                  </span>
+                  <% } else if (profit < 0) { %>
+                  <span class="text-danger">
+                    <i class="fas fa-arrow-down me-1"></i>
+                    Loss: <%= Math.abs(profit).toFixed(2) %> EGP (<%=
+                    Math.abs(profitPercent).toFixed(1) %>%)
+                  </span>
+                  <% } else { %>
+                  <span class="text-muted">
+                    <i class="fas fa-minus me-1"></i>
+                    Break-even
+                  </span>
+                  <% } %>
+                </p>
+              </div>
+              <% } %>
+
+              <div class="mb-3">
+                <strong>Description:</strong>
+                <p class="text-muted mb-1">
+                  <%= product.description || 'No description available' %>
+                </p>
+              </div>
+
+              <div class="row mb-3">
+                <div class="col-6">
+                  <strong>Created:</strong>
+                  <p class="text-muted mb-1">
+                    <%= new Date(product.created_at).toLocaleDateString() %>
+                  </p>
+                </div>
+                <div class="col-6">
+                  <strong>Updated:</strong>
+                  <p class="text-muted mb-1">
+                    <%= product.updated_at ? new
+                    Date(product.updated_at).toLocaleDateString() : 'Never' %>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function changeMainImage(src) {
+    const mainImage = document.querySelector(".main-image img");
+    if (mainImage) {
+      mainImage.src = src;
+    }
+  }
+</script>

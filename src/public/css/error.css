@@ -1,0 +1,35 @@
+/* Error Page Styles */
+.error-page .card {
+  border-radius: 15px;
+}
+
+.error-page .btn {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.error-page .alert {
+  border-radius: 8px;
+}
+
+.error-page .badge {
+  border-radius: 6px;
+}
+
+.error-page pre {
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  padding: 1rem;
+  border: 1px solid #e9ecef;
+}
+
+/* Error icon styling */
+.error-page .error-icon {
+  font-size: 4rem;
+}
+
+/* Debug section styling */
+.error-page .debug-section {
+  max-height: 200px;
+  overflow-y: auto;
+}

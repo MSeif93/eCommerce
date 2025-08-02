@@ -74,6 +74,8 @@ initializePassport(passport);
 // Make user available to all views
 app.use(async (req, res, next) => {
   try {
+    console.log("SESSION CONTENT:", req.session);
+
     res.locals.user = req.user;
 
     // Get pending orders count for all views
@@ -128,7 +130,6 @@ const upload = multer({
   fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB max per file
-    files: 5, // max 5 files
   },
 });
 
@@ -168,16 +169,6 @@ app.get("/", async (req, res) => {
     products: [],
     user: req.user,
     categories: categoriesResult.rows,
-  });
-});
-
-// Debug route to check session and user
-app.get("/debug/session", (req, res) => {
-  res.json({
-    sessionID: req.sessionID,
-    user: req.user,
-    isAuthenticated: req.isAuthenticated(),
-    session: req.session,
   });
 });
 
@@ -261,7 +252,7 @@ app.get("/dashboard", async (req, res) => {
       shippingOptionsResult,
       productsResult,
       ordersResult,
-      totalProducts,
+      totalActiveProducts,
       totalOrders,
       totalIncome,
       lowStock,
@@ -269,12 +260,16 @@ app.get("/dashboard", async (req, res) => {
     ] = await Promise.all([
       db.query("SELECT * FROM admins ORDER BY created_at DESC"),
       db.query("SELECT * FROM shipping_options ORDER BY name"),
-      db.query("SELECT * FROM products ORDER BY created_at DESC"),
+      db.query(
+        "SELECT * FROM products WHERE is_active = true ORDER BY created_at DESC"
+      ),
       db.query("SELECT * FROM orders ORDER BY created_at DESC"),
-      db.query("SELECT COUNT(*) FROM products"),
+      db.query("SELECT COUNT(*) FROM products WHERE is_active = true"),
       db.query("SELECT COUNT(*) FROM orders"),
       db.query("SELECT SUM(total) FROM orders"),
-      db.query("SELECT * FROM products WHERE stock <= 5 ORDER BY stock ASC"),
+      db.query(
+        "SELECT * FROM products WHERE stock <= 5 AND is_active = true ORDER BY stock ASC"
+      ),
       db.query(`
           SELECT COUNT(*) FROM orders 
           WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)
@@ -328,13 +323,21 @@ app.get("/dashboard", async (req, res) => {
       data: salesData.rows.map((row) => parseFloat(row.total)),
     };
 
+    // Sort: superadmin first, then by name (case-insensitive)
+    let admins = adminsResult.rows;
+    admins.sort((a, b) => {
+      if (a.role === "superadmin" && b.role !== "superadmin") return -1;
+      if (a.role !== "superadmin" && b.role === "superadmin") return 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
+
     res.render("adminDashboard", {
-      admins: adminsResult.rows,
+      admins: admins,
       shippingOptions: shippingOptionsResult.rows,
       products: productsResult.rows,
       orders: ordersResult.rows,
       summary: {
-        totalProducts: totalProducts.rows[0].count,
+        totalActiveProducts: totalActiveProducts.rows[0].count,
         totalOrders: totalOrders.rows[0].count,
         totalIncome: totalIncome.rows[0].sum || 0,
         monthlySales: monthlySales.rows[0].count,
@@ -352,45 +355,170 @@ app.get("/dashboard", async (req, res) => {
 
 // GET /admin/products
 app.get("/admin/products", async (req, res) => {
-  const limit = 10;
+  const limit = 20;
   const page = parseInt(req.query.page) || 1;
   const offset = (page - 1) * limit;
   const search = req.query.search || "";
-
-  const query = `
-    SELECT p.*, c.main_category, c.sub_category,
-      (SELECT image_url FROM product_images WHERE product_id = p.id AND is_main = true LIMIT 1) AS main_image
-    FROM products p
-    JOIN categories c ON p.category_id = c.id
-    WHERE p.name ILIKE $1
-    ORDER BY p.created_at DESC
-    LIMIT $2 OFFSET $3
-  `;
-
-  const countQuery = `
-    SELECT COUNT(*) FROM products p
-    JOIN categories c ON p.category_id = c.id
-    WHERE p.name ILIKE $1
-  `;
+  const selectedCategory = req.query.category || "";
+  const selectedStock = req.query.stock || "";
+  const selectedRating = req.query.rating || "";
+  const showInactive = req.query.showInactive || "active"; // Default to active only
 
   try {
+    // Build the WHERE clause based on filters
+    let whereConditions = ["p.name ILIKE $1"];
+    let queryParams = [`%${search}%`];
+    let paramIndex = 2;
+
+    // Handle product status filter
+    if (showInactive === "active") {
+      whereConditions.push(`p.is_active = true`);
+    } else if (showInactive === "inactive") {
+      whereConditions.push(`p.is_active = false`);
+    }
+    // If showInactive === "all", don't add any filter condition
+
+    if (selectedCategory) {
+      whereConditions.push(`c.id = $${paramIndex}`);
+      queryParams.push(selectedCategory);
+      paramIndex++;
+    }
+
+    if (selectedStock) {
+      switch (selectedStock) {
+        case "in_stock":
+          whereConditions.push(`p.stock > 5`);
+          break;
+        case "low_stock":
+          whereConditions.push(`p.stock <= 5 AND p.stock > 0`);
+          break;
+        case "out_of_stock":
+          whereConditions.push(`p.stock = 0`);
+          break;
+      }
+    }
+
+    if (selectedRating) {
+      whereConditions.push(`COALESCE(AVG(r.rating), 0) >= $${paramIndex}`);
+      queryParams.push(parseInt(selectedRating));
+      paramIndex++;
+    }
+
+    const whereClause = whereConditions.join(" AND ");
+
+    const query = `
+      SELECT 
+        p.*,
+        c.main_category as category_name,
+        sc.sub_category as subcategory_name,
+        (SELECT image_url FROM product_images WHERE product_id = p.id AND is_main = true LIMIT 1) AS main_image,
+        COALESCE(AVG(r.rating), 0) as average_rating,
+        COUNT(r.id) as review_count
+      FROM products p
+      JOIN sub_categories sc ON p.subcategory_id = sc.id
+      JOIN categories c ON sc.category_id = c.id
+      LEFT JOIN reviews r ON p.id = r.product_id
+      WHERE ${whereClause}
+      GROUP BY p.id, c.main_category, sc.sub_category
+      ORDER BY p.created_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    const countQuery = `
+      SELECT COUNT(DISTINCT p.id) FROM products p
+      JOIN sub_categories sc ON p.subcategory_id = sc.id
+      JOIN categories c ON sc.category_id = c.id
+      LEFT JOIN reviews r ON p.id = r.product_id
+      WHERE ${whereClause}
+    `;
+
+    // Get products
     const { rows: products } = await db.query(query, [
-      `%${search}%`,
+      ...queryParams,
       limit,
       offset,
     ]);
-    const totalCount = await db.query(countQuery, [`%${search}%`]);
-    const totalPages = Math.ceil(totalCount.rows[0].count / limit);
 
-    res.render("productList", {
+    // Get total count
+    const totalCountResult = await db.query(countQuery, queryParams);
+    const totalCount = parseInt(totalCountResult.rows[0].count);
+    const totalPages = Math.ceil(totalCount / limit);
+
+    // Get categories for filter dropdown
+    const categoriesResult = await db.query(`
+      SELECT DISTINCT id, main_category 
+      FROM categories 
+      ORDER BY main_category
+    `);
+
+    // Get statistics
+    const statsResult = await db.query(`
+      SELECT 
+        COUNT(*) as total_products,
+        COUNT(CASE WHEN is_active = true THEN 1 END) as active_products,
+        COUNT(CASE WHEN stock <= 5 AND stock > 0 THEN 1 END) as low_stock_products,
+        SUM(CASE WHEN is_active = true THEN cost * stock ELSE 0 END) as total_value
+      FROM products
+    `);
+
+    // Get review statistics
+    const reviewStatsResult = await db.query(`
+      SELECT 
+        COALESCE(AVG(r.rating), 0) as average_rating,
+        COUNT(r.id) as total_reviews
+      FROM reviews r
+      JOIN products p ON r.product_id = p.id
+      WHERE p.is_active = true
+    `);
+
+    const stats = statsResult.rows[0];
+    const reviewStats = reviewStatsResult.rows[0];
+
+    res.render("adminProducts", {
       products,
       search,
+      selectedCategory,
+      selectedStock,
+      selectedRating,
+      showInactive,
       currentPage: page,
       totalPages,
+      categories: categoriesResult.rows,
+      totalProducts: stats.total_products,
+      activeProducts: stats.active_products,
+      lowStockProducts: stats.low_stock_products,
+      totalValue: parseFloat(stats.total_value || 0),
+      averageRating: parseFloat(reviewStats.average_rating || 0),
+      totalReviews: parseInt(reviewStats.total_reviews || 0),
+      success: req.flash("success"),
+      error: req.flash("error"),
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Server Error");
+    console.error("❌ Error loading admin products:", err);
+    res.status(500).render("error", {
+      error: "Failed to load products",
+      details: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : null,
+    });
+  }
+});
+
+// API endpoint for fetching subcategories
+app.get("/api/subcategories/:category", async (req, res) => {
+  try {
+    const { category } = req.params;
+    const result = await db.query(
+      `SELECT sc.id, sc.sub_category 
+       FROM sub_categories sc 
+       JOIN categories c ON sc.category_id = c.id 
+       WHERE c.main_category = $1 
+       ORDER BY sc.sub_category`,
+      [category]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching subcategories:", err);
+    res.status(500).json({ error: "Failed to fetch subcategories" });
   }
 });
 
@@ -400,9 +528,10 @@ app.get("/admin/products/edit/:id", async (req, res) => {
   try {
     const productRes = await db.query(
       `
-      SELECT p.*, c.main_category, c.sub_category
+      SELECT p.*, c.main_category, sc.sub_category
       FROM products p
-      JOIN categories c ON p.category_id = c.id
+      JOIN sub_categories sc ON p.subcategory_id = sc.id
+      JOIN categories c ON sc.category_id = c.id
       WHERE p.id = $1
     `,
       [id]
@@ -415,12 +544,23 @@ app.get("/admin/products/edit/:id", async (req, res) => {
 
     const categories = await db.query("SELECT * FROM categories");
 
+    // Get subcategories for the current product's category
+    const subcategories = await db.query(
+      `SELECT sc.id, sc.sub_category 
+       FROM sub_categories sc 
+       JOIN categories c ON sc.category_id = c.id 
+       WHERE c.main_category = $1 
+       ORDER BY sc.sub_category`,
+      [productRes.rows[0].main_category]
+    );
+
     if (!productRes.rows.length) return res.status(404).send("Not found");
 
     res.render("editProduct", {
       product: productRes.rows[0],
       images: imagesRes.rows,
       categories: categories.rows,
+      subcategories: subcategories.rows,
     });
   } catch (err) {
     console.error(err);
@@ -441,17 +581,22 @@ app.post(
       req.body;
 
     try {
-      // Determine the category
-      const catRes = await db.query(
-        "SELECT id FROM categories WHERE main_category = $1 AND sub_category = $2",
+      // Determine the subcategory
+      const subcatRes = await db.query(
+        "SELECT sc.id FROM sub_categories sc JOIN categories c ON sc.category_id = c.id WHERE c.main_category = $1 AND sc.sub_category = $2",
         [main_category, sub_category]
       );
-      const category_id = catRes.rows[0]?.id;
+      const subcategory_id = subcatRes.rows[0]?.id;
+
+      if (!subcategory_id) {
+        req.flash("error", "Invalid category/subcategory combination");
+        return res.redirect(`/admin/products/edit/${id}`);
+      }
 
       // Update product data
       await db.query(
-        "UPDATE products SET name=$1, description=$2, price=$3, stock=$4, category_id=$5 WHERE id=$6",
-        [name, description, price, stock, category_id, id]
+        "UPDATE products SET name=$1, description=$2, price=$3, stock=$4, subcategory_id=$5 WHERE id=$6",
+        [name, description, price, stock, subcategory_id, id]
       );
 
       // Update main image (if a new image is uploaded)
@@ -491,6 +636,21 @@ app.post(
         req.files["additional_images"] &&
         req.files["additional_images"].length > 0
       ) {
+        const oldImages = await db.query(
+          "SELECT image_url FROM product_images WHERE product_id = $1 AND is_main = false",
+          [id]
+        );
+        if (oldImages.rows.length) {
+          for (const img of oldImages.rows) {
+            const oldPath = path.join("uploads", img.image_url);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+          }
+          await db.query(
+            "DELETE FROM product_images WHERE product_id = $1 AND is_main = false",
+            [id]
+          );
+        }
+
         const images = req.files["additional_images"];
 
         for (let img of images) {
@@ -506,7 +666,7 @@ app.post(
           action: "update",
           table_name: "product_images",
           record_id: id,
-          message: `Added ${images.length} additional images to product ${name}`,
+          message: `Replaced the additional images for product ${name}`,
         });
       }
 
@@ -523,7 +683,12 @@ app.post(
       res.redirect("/admin/products");
     } catch (err) {
       console.error("❌ Error updating product:", err);
-      res.status(500).send("Failed to update product");
+      res.status(500).render("error", {
+        error: "Failed to update product",
+        errorCode: "500",
+        details: err.message,
+        stack: process.env.NODE_ENV === "development" ? err.stack : null,
+      });
     }
   }
 );
@@ -534,33 +699,243 @@ app.post("/admin/products/delete/:id", async (req, res) => {
     const { id } = req.params;
     const adminId = req.user?.id || null;
 
-    // Get product name before deletion for logging
+    // Get product name before deactivation for logging
     const productRes = await db.query(
       "SELECT name FROM products WHERE id = $1",
       [id]
     );
-    const productName = productRes.rows[0]?.name || "Unknown";
 
-    await db.query("DELETE FROM products WHERE id = $1", [id]);
+    if (!productRes.rows.length) {
+      req.flash("error", "Product not found");
+      return res.redirect("/admin/products");
+    }
+
+    const productName = productRes.rows[0].name;
+
+    // Deactivate the product instead of deleting it
+    await db.query("UPDATE products SET is_active = false WHERE id = $1", [id]);
 
     // Log the action
     await logAdminAction({
       admin_id: adminId,
       admin_name: req.user?.name || "Unknown",
-      action: "delete",
+      action: "deactivate",
       table_name: "products",
       record_id: id,
-      message: `Deleted product: ${productName}`,
+      message: `Deactivated product: ${productName}`,
     });
 
+    req.flash("success", `Product "${productName}" deactivated successfully`);
     res.redirect("/admin/products");
   } catch (err) {
-    console.error("❌ Error deleting product:", err);
-    res.status(500).send("Failed to delete product");
+    console.error("❌ Error deactivating product:", err);
+    req.flash("error", "Failed to deactivate product. Please try again.");
+    res.redirect("/admin/products");
   }
 });
 
-// GET /admin/categories (public route for users)
+// POST /admin/products/reactivate/:id
+app.post("/admin/products/reactivate/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user?.id || null;
+
+    // Get product name before reactivation for logging
+    const productRes = await db.query(
+      "SELECT name FROM products WHERE id = $1",
+      [id]
+    );
+
+    if (!productRes.rows.length) {
+      req.flash("error", "Product not found");
+      return res.redirect("/admin/products");
+    }
+
+    const productName = productRes.rows[0].name;
+
+    // Reactivate the product
+    await db.query("UPDATE products SET is_active = true WHERE id = $1", [id]);
+
+    // Log the action
+    await logAdminAction({
+      admin_id: adminId,
+      admin_name: req.user?.name || "Unknown",
+      action: "reactivate",
+      table_name: "products",
+      record_id: id,
+      message: `Reactivated product: ${productName}`,
+    });
+
+    req.flash("success", `Product "${productName}" reactivated successfully`);
+    res.redirect("/admin/products");
+  } catch (err) {
+    console.error("❌ Error reactivating product:", err);
+    req.flash("error", "Failed to reactivate product. Please try again.");
+    res.redirect("/admin/products");
+  }
+});
+
+// GET /admin/products/view/:id
+app.get("/admin/products/view/:id", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.redirect("/login");
+  }
+
+  try {
+    const { id } = req.params;
+
+    const productResult = await db.query(
+      `
+      SELECT 
+        p.*,
+        c.main_category as category_name,
+        sc.sub_category as subcategory_name
+      FROM products p
+      JOIN sub_categories sc ON p.subcategory_id = sc.id
+      JOIN categories c ON sc.category_id = c.id
+      WHERE p.id = $1
+    `,
+      [id]
+    );
+
+    if (!productResult.rows.length) {
+      req.flash("error", "Product not found");
+      return res.redirect("/admin/products");
+    }
+
+    const product = productResult.rows[0];
+
+    // Get all images for the product
+    const imagesResult = await db.query(
+      `
+      SELECT * FROM product_images 
+      WHERE product_id = $1 
+      ORDER BY is_main DESC, id ASC
+    `,
+      [id]
+    );
+
+    res.render("viewProduct", {
+      title: `View Product - ${product.name}`,
+      product,
+      images: imagesResult.rows,
+      user: req.user,
+    });
+  } catch (err) {
+    console.error("❌ Error viewing product:", err);
+    req.flash("error", "Failed to load product details");
+    res.redirect("/admin/products");
+  }
+});
+
+// GET /admin/products/add
+app.get("/admin/products/add", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.redirect("/login");
+  }
+  // Fetch only categories for dropdown (subcategories loaded via API)
+  const categories = await db.query(
+    "SELECT * FROM categories ORDER BY main_category ASC"
+  );
+  res.render("addProduct", {
+    user: req.user,
+    categories: categories.rows,
+    error: req.flash("error")[0] || "",
+    success: req.flash("success")[0] || "",
+  });
+});
+
+// POST /admin/products/add
+app.post(
+  "/admin/products/add",
+  upload.fields([
+    { name: "main_image", maxCount: 1 },
+    { name: "additional_images", maxCount: 4 },
+  ]),
+  async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.redirect("/login");
+    }
+    try {
+      const { name, description, cost, price, stock, sub_category } = req.body;
+      if (
+        !name ||
+        !price ||
+        !stock ||
+        !cost ||
+        !sub_category ||
+        !req.files["main_image"]
+      ) {
+        req.flash("error", "All required fields must be filled.");
+        return res.redirect("/admin/products/add");
+      }
+      // Insert product
+      const result = await db.query(
+        "INSERT INTO products (name, description, cost, price, stock, subcategory_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+        [name, description, cost, price, stock, sub_category]
+      );
+      const productId = result.rows[0].id;
+      // Save main image
+      const mainImage = req.files["main_image"][0];
+      await db.query(
+        "INSERT INTO product_images (product_id, image_url, is_main) VALUES ($1, $2, true)",
+        [productId, mainImage.filename]
+      );
+      // Save additional images
+      if (req.files["additional_images"]) {
+        for (const img of req.files["additional_images"]) {
+          await db.query(
+            "INSERT INTO product_images (product_id, image_url, is_main) VALUES ($1, $2, false)",
+            [productId, img.filename]
+          );
+        }
+      }
+
+      // Log the main product creation action
+      await logAdminAction({
+        admin_id: req.user.id,
+        admin_name: req.user.name,
+        action: "create",
+        table_name: "products",
+        record_id: productId,
+        message: `Created new product: ${name}`,
+      });
+
+      // Log image upload actions
+      await logAdminAction({
+        admin_id: req.user.id,
+        admin_name: req.user.name,
+        action: "create",
+        table_name: "product_images",
+        record_id: productId,
+        message: `Uploaded main image for product: ${name}`,
+      });
+
+      if (
+        req.files["additional_images"] &&
+        req.files["additional_images"].length > 0
+      ) {
+        await logAdminAction({
+          admin_id: req.user.id,
+          admin_name: req.user.name,
+          action: "create",
+          table_name: "product_images",
+          record_id: productId,
+          message: `Uploaded ${req.files["additional_images"].length} additional images for product: ${name}`,
+        });
+      }
+
+      req.flash("success", "Product added successfully!");
+      res.redirect("/admin/products");
+    } catch (err) {
+      console.error("Error adding product:", err);
+      req.flash("error", "Failed to add product. Please try again.");
+      res.redirect("/admin/products/add");
+    }
+  }
+);
+
+// GET /categories (public route for users)
 // app.get("/categories", async (req, res) => {
 //   try {
 //     const categoriesResult = await db.query(`
@@ -606,7 +981,11 @@ app.get("/admin/categories", async (req, res) => {
   }
 
   if (req.user.role !== "superadmin") {
-    return res.status(403).send("Unauthorized");
+    return res.status(403).render("error", {
+      error: "Unauthorized",
+      errorCode: "403",
+      errorDetails: "You are not authorized to access this page.",
+    });
   }
 
   try {
@@ -1273,108 +1652,304 @@ app.post("/admin/shipping/delete/:id", async (req, res) => {
   }
 });
 
-// GET /admin/shipping/edit/:id
-app.get("/admin/shipping/edit/:id", async (req, res) => {
+// GET /admin/admins (superadmin only)
+app.get("/admin/admins", async (req, res) => {
   try {
-    const { id } = req.params;
-
-    // Check if user is authenticated and is superadmin
     if (!req.isAuthenticated() || req.user.role !== "superadmin") {
       return res.status(403).send("Unauthorized");
     }
 
-    // Get shipping option details
-    const shippingResult = await db.query(
-      "SELECT * FROM shipping_options WHERE id = $1",
-      [id]
+    const adminsResult = await db.query(
+      "SELECT id, name, email, role, created_at FROM admins ORDER BY created_at DESC"
     );
 
-    if (!shippingResult.rows.length) {
-      req.flash("error", "Shipping option not found");
-      return res.redirect("/admin/shipping");
-    }
+    // Sort: superadmin first, then by name (case-insensitive)
+    let admins = adminsResult.rows;
+    admins.sort((a, b) => {
+      if (a.role === "superadmin" && b.role !== "superadmin") return -1;
+      if (a.role !== "superadmin" && b.role === "superadmin") return 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
 
-    res.render("editShipping", {
+    res.render("adminAdmins", {
+      title: "Admin Management",
       user: req.user,
-      shipping: shippingResult.rows[0],
-      error: req.flash("error"),
+      admins: admins,
+      error: req.flash("error")[0] || "",
+      success: req.flash("success")[0] || "",
     });
   } catch (err) {
-    console.error("Error loading shipping edit page:", err);
-    res.status(500).send("Failed to load shipping edit page.");
+    console.error("Error loading admins:", err);
+    res.status(500).send("Failed to load admins.");
   }
 });
 
-// POST /admin/shipping/edit/:id
-app.post("/admin/shipping/edit/:id", async (req, res) => {
+// POST /admin/admins/add (superadmin only)
+app.post("/admin/admins/add", async (req, res) => {
   try {
-    const { id } = req.params;
-    const { name, price } = req.body;
-
-    // Check if user is authenticated and is superadmin
     if (!req.isAuthenticated() || req.user.role !== "superadmin") {
       return res.status(403).send("Unauthorized");
     }
 
-    // Validate input
-    if (!name || !price || isNaN(price) || Number(price) < 0) {
-      req.flash("error", "Invalid city name or price.");
-      return res.redirect(`/admin/shipping/edit/${id}`);
+    const { name, email, password, role } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !password) {
+      req.flash("error", "Name, email, and password are required.");
+      return res.redirect("/admin/admins");
     }
 
-    // Check if shipping option exists
-    const shippingCheck = await db.query(
-      "SELECT id, name FROM shipping_options WHERE id = $1",
-      [id]
+    // Validate role
+    const validRoles = ["admin", "superadmin"];
+    const selectedRole = role || "admin";
+    if (!validRoles.includes(selectedRole)) {
+      req.flash("error", "Invalid role selected.");
+      return res.redirect("/admin/admins");
+    }
+
+    // Check if email already exists
+    const existingAdmin = await db.query(
+      "SELECT id FROM admins WHERE email = $1",
+      [email.trim()]
     );
 
-    if (!shippingCheck.rows.length) {
-      req.flash("error", "Shipping option not found");
-      return res.redirect("/admin/shipping");
+    if (existingAdmin.rows.length > 0) {
+      req.flash("error", "An admin with this email already exists.");
+      return res.redirect("/admin/admins");
     }
 
-    const oldName = shippingCheck.rows[0].name;
+    // Hash password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Check if new name already exists (case-insensitive, excluding current record)
-    const existingCity = await db.query(
-      "SELECT id FROM shipping_options WHERE LOWER(name) = LOWER($1) AND id != $2",
-      [name.trim(), id]
-    );
-
-    if (existingCity.rows.length > 0) {
-      req.flash("error", "A shipping option with this name already exists");
-      return res.redirect(`/admin/shipping/edit/${id}`);
-    }
-
-    // Update shipping option
-    await db.query(
-      "UPDATE shipping_options SET name = $1, price = $2 WHERE id = $3",
-      [name.trim(), Number(price), id]
+    // Insert new admin
+    const result = await db.query(
+      "INSERT INTO admins (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id",
+      [name.trim(), email.trim(), hashedPassword, selectedRole]
     );
 
     // Log the action
     await logAdminAction({
       admin_id: req.user.id,
       admin_name: req.user.name,
-      action: "update",
-      table_name: "shipping_options",
-      record_id: id,
-      message: `Updated shipping option from "${oldName}" to "${name.trim()}"`,
+      action: "create",
+      table_name: "admins",
+      record_id: result.rows[0].id,
+      message: `Created new ${selectedRole}: ${name.trim()}`,
     });
 
-    req.flash("success", `Shipping option updated successfully`);
-    res.redirect("/admin/shipping");
+    req.flash("success", `Admin "${name.trim()}" created successfully`);
+    res.redirect("/admin/admins");
   } catch (err) {
-    console.error("Error updating shipping option:", err);
-    req.flash("error", "Failed to update shipping option. Please try again.");
-    res.redirect(`/admin/shipping/edit/${id}`);
+    console.error("Error creating admin:", err);
+    req.flash("error", "Failed to create admin. Please try again.");
+    res.redirect("/admin/admins");
   }
+});
+
+// POST /admin/admins/delete/:id (superadmin only)
+app.post("/admin/admins/delete/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.isAuthenticated() || req.user.role !== "superadmin") {
+      req.flash("error", "You don't have permission to perform this action");
+      return res.redirect("/admin/admins");
+    }
+
+    // Prevent self-deletion
+    if (parseInt(id) === req.user.id) {
+      req.flash("error", "You cannot delete your own account");
+      return res.redirect("/admin/admins");
+    }
+
+    // Check if admin exists and get details
+    const adminCheck = await db.query(
+      "SELECT id, name, email, role FROM admins WHERE id = $1",
+      [id]
+    );
+
+    if (!adminCheck.rows.length) {
+      req.flash("error", "Admin not found");
+      return res.redirect("/admin/admins");
+    }
+
+    const adminToDelete = adminCheck.rows[0];
+
+    // Prevent deletion of other superadmins (optional security measure)
+    if (adminToDelete.role === "superadmin") {
+      req.flash("error", "Cannot delete superadmin accounts");
+      return res.redirect("/admin/admins");
+    }
+
+    // Delete admin
+    await db.query("DELETE FROM admins WHERE id = $1", [id]);
+
+    // Log the action
+    await logAdminAction({
+      admin_id: req.user.id,
+      admin_name: req.user.name,
+      action: "delete",
+      table_name: "admins",
+      record_id: id,
+      message: `Deleted admin: ${adminToDelete.name} (${adminToDelete.email})`,
+    });
+
+    req.flash("success", `Admin "${adminToDelete.name}" deleted successfully`);
+    res.redirect("/admin/admins");
+  } catch (err) {
+    console.error("❌ Failed to delete admin:", err);
+    req.flash("error", "Failed to delete admin. Please try again.");
+    res.redirect("/admin/admins");
+  }
+});
+
+// GET /admin/admins/edit/:id (superadmin only)
+app.get("/admin/admins/edit/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.isAuthenticated() || req.user.role !== "superadmin") {
+      return res.status(403).send("Unauthorized");
+    }
+
+    // Get admin details
+    const adminResult = await db.query(
+      "SELECT id, name, email, role FROM admins WHERE id = $1",
+      [id]
+    );
+
+    if (!adminResult.rows.length) {
+      req.flash("error", "Admin not found");
+      return res.redirect("/admin/admins");
+    }
+
+    res.render("editAdmin", {
+      user: req.user,
+      admin: adminResult.rows[0],
+      error: req.flash("error"),
+    });
+  } catch (err) {
+    console.error("Error loading admin edit page:", err);
+    res.status(500).send("Failed to load admin edit page.");
+  }
+});
+
+// POST /admin/admins/edit/:id (superadmin only)
+app.post("/admin/admins/edit/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, password, role } = req.body;
+
+    if (!req.isAuthenticated() || req.user.role !== "superadmin") {
+      return res.status(403).send("Unauthorized");
+    }
+
+    // Validate required fields
+    if (!name || !email) {
+      req.flash("error", "Name and email are required.");
+      return res.redirect(`/admin/admins/edit/${id}`);
+    }
+
+    // Validate role
+    const validRoles = ["admin", "superadmin"];
+    const selectedRole = role || "admin";
+    if (!validRoles.includes(selectedRole)) {
+      req.flash("error", "Invalid role selected.");
+      return res.redirect(`/admin/admins/edit/${id}`);
+    }
+
+    // Check if admin exists
+    const adminCheck = await db.query(
+      "SELECT id, name, email, role FROM admins WHERE id = $1",
+      [id]
+    );
+
+    if (!adminCheck.rows.length) {
+      req.flash("error", "Admin not found");
+      return res.redirect("/admin/admins");
+    }
+
+    const oldAdmin = adminCheck.rows[0];
+
+    // Check if new email already exists (excluding current admin)
+    const existingAdmin = await db.query(
+      "SELECT id FROM admins WHERE email = $1 AND id != $2",
+      [email.trim(), id]
+    );
+
+    if (existingAdmin.rows.length > 0) {
+      req.flash("error", "An admin with this email already exists.");
+      return res.redirect(`/admin/admins/edit/${id}`);
+    }
+
+    // Prepare update query
+    let updateQuery = "UPDATE admins SET name = $1, email = $2, role = $3";
+    let queryParams = [name.trim(), email.trim(), selectedRole];
+
+    // Add password update if provided
+    if (password && password.trim()) {
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+      updateQuery += ", password = $4 WHERE id = $5";
+      queryParams.push(hashedPassword, id);
+    } else {
+      updateQuery += " WHERE id = $4";
+      queryParams.push(id);
+    }
+
+    // Update admin
+    await db.query(updateQuery, queryParams);
+
+    // Log the action
+    await logAdminAction({
+      admin_id: req.user.id,
+      admin_name: req.user.name,
+      action: "update",
+      table_name: "admins",
+      record_id: id,
+      message: `Updated admin: ${name.trim()} (${email.trim()})`,
+    });
+
+    req.flash("success", "Admin updated successfully");
+    res.redirect("/admin/admins");
+  } catch (err) {
+    console.error("Error updating admin:", err);
+    req.flash("error", "Failed to update admin. Please try again.");
+    res.redirect(`/admin/admins/edit/${id}`);
+  }
+});
+
+// 404 handler - must be before error handling middleware
+app.use((req, res) => {
+  res.status(404).render("404");
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      req.flash("error", "Each image must be less than 5MB.");
+    } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
+      req.flash(
+        "error",
+        "You can upload 1 main image and up to 4 additional images only."
+      );
+    } else if (err.code === "LIMIT_FILE_COUNT") {
+      req.flash("error", "Too many files uploaded.");
+    } else {
+      req.flash("error", "Upload error: " + err.message);
+    }
+
+    return res.redirect("back");
+  }
+
   console.error(err.stack);
-  res.status(500).render("error", { error: "Something went wrong!" });
+  res.status(500).render("error", {
+    error: "Something went wrong!",
+    errorCode: "500",
+    errorDetails: "An unexpected error occurred on the server.",
+  });
 });
 
 // Start server

@@ -1,0 +1,388 @@
+<% title = 'Admin Products' %>
+
+<link rel="stylesheet" href="/css/adminAdmins.css" />
+<link rel="stylesheet" href="/css/toast.css" />
+<script src="/js/toast.js" defer></script>
+
+<% if (success && success.length > 0) { %>
+<meta name="flash-success" content="<%= success %>" />
+<% } %> <% if (error && error.length > 0) { %>
+<meta name="flash-error" content="<%= error %>" />
+<% } %>
+
+<div class="container py-4">
+  <!-- Header Section -->
+  <div class="row mb-4">
+    <div class="col-md-8">
+      <h2 class="mb-2">
+        <i class="fas fa-boxes text-primary me-2"></i>
+        Product Management
+      </h2>
+      <p class="text-muted mb-0">
+        Manage your product catalog, inventory, and pricing
+      </p>
+    </div>
+    <div class="col-md-4 text-end">
+      <a href="/admin/products/add" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>Add New Product
+      </a>
+    </div>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="row mb-4">
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-box text-primary mb-2" style="font-size: 2rem;"></i>
+          <h4 class="mb-1"><%= totalProducts %></h4>
+          <small class="text-muted">Total Products</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-check-circle text-success mb-2" style="font-size: 2rem;"></i>
+          <h4 class="mb-1"><%= activeProducts %></h4>
+          <small class="text-muted">Active Products</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-exclamation-triangle text-warning mb-2" style="font-size: 2rem;"></i>
+          <h4 class="mb-1"><%= lowStockProducts %></h4>
+          <small class="text-muted">Low Stock (≤5)</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-money-bill-wave text-info mb-2" style="font-size: 2rem;"></i>
+          <h4 class="mb-1"><%= totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></h4>
+          <small class="text-muted">Total Value (EGP)</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-star text-warning mb-2" style="font-size: 2rem;"></i>
+          <h4 class="mb-1"><%= averageRating ? averageRating.toFixed(1) : '0.0' %></h4>
+          <small class="text-muted">Avg Rating</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-comments text-secondary mb-2" style="font-size: 2rem;"></i>
+          <h4 class="mb-1"><%= totalReviews || 0 %></h4>
+          <small class="text-muted">Total Reviews</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search and Filter Section -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <form method="GET" class="row g-3">
+        <div class="col-md-4">
+          <label for="search" class="form-label">Search Products</label>
+          <input
+            type="text"
+            class="form-control"
+            id="search"
+            name="search"
+            value="<%= search %>"
+            placeholder="Search by name, description..."
+          />
+        </div>
+        <div class="col-md-3">
+          <label for="category" class="form-label">Category</label>
+          <select class="form-select" id="category" name="category">
+            <option value="">All Categories</option>
+            <% categories.forEach(cat => { %>
+            <option value="<%= cat.id %>" <%= selectedCategory == cat.id ? 'selected' : '' %>>
+              <%= cat.main_category %>
+            </option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label for="stock" class="form-label">Stock Status</label>
+          <select class="form-select" id="stock" name="stock">
+            <option value="">All Stock</option>
+            <option value="in_stock" <%= selectedStock == 'in_stock' ? 'selected' : '' %>>In Stock</option>
+            <option value="low_stock" <%= selectedStock == 'low_stock' ? 'selected' : '' %>>Low Stock</option>
+            <option value="out_of_stock" <%= selectedStock == 'out_of_stock' ? 'selected' : '' %>>Out of Stock</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label for="rating" class="form-label">Min Rating</label>
+          <select class="form-select" id="rating" name="rating">
+            <option value="">Any Rating</option>
+            <option value="4" <%= selectedRating == '4' ? 'selected' : '' %>>4+ Stars</option>
+            <option value="3" <%= selectedRating == '3' ? 'selected' : '' %>>3+ Stars</option>
+            <option value="2" <%= selectedRating == '2' ? 'selected' : '' %>>2+ Stars</option>
+            <option value="1" <%= selectedRating == '1' ? 'selected' : '' %>>1+ Stars</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label for="showInactive" class="form-label">Show Inactive</label>
+          <select class="form-select" id="showInactive" name="showInactive">
+            <option value="all" <%= showInactive === 'all' ? 'selected' : '' %>>All Products</option>
+            <option value="active" <%= showInactive === 'active' ? 'selected' : '' %>>Active Only</option>
+            <option value="inactive" <%= showInactive === 'inactive' ? 'selected' : '' %>>Inactive Only</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="fas fa-search me-1"></i>Search
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Products Table -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0">
+      <div class="row align-items-center">
+        <div class="col">
+          <h5 class="mb-0">Products (<%= products.length %>)</h5>
+        </div>
+        <div class="col-auto">
+          <div class="btn-group" role="group">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="viewGrid">
+              <i class="fas fa-th"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm active" id="viewList">
+              <i class="fas fa-list"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <% if (products.length === 0) { %>
+      <div class="text-center py-5">
+        <i class="fas fa-box-open text-muted mb-3" style="font-size: 3rem;"></i>
+        <h5 class="text-muted">No products found</h5>
+        <p class="text-muted">Try adjusting your search criteria or add a new product.</p>
+        <a href="/admin/products/add" class="btn btn-primary">
+          <i class="fas fa-plus me-2"></i>Add First Product
+        </a>
+      </div>
+      <% } else { %>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Product</th>
+              <th>Category</th>
+              <th>Stock</th>
+              <th>Cost</th>
+              <th>Price</th>
+              <th>Profit</th>
+              <th>Rating</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% products.forEach(product => { %>
+            <tr>
+              <td>
+                <div class="d-flex align-items-center">
+                  <img
+                    src="/uploads/<%= product.main_image %>"
+                    alt="<%= product.name %>"
+                    class="rounded me-3"
+                    style="width: 50px; height: 50px; object-fit: cover;"
+                  />
+                  <div>
+                    <h6 class="mb-1"><%= product.name %></h6>
+                    <small class="text-muted">
+                      <%= product.description ? product.description.substring(0, 50) + '...' : 'No description' %>
+                    </small>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="badge bg-light text-dark">
+                  <%= product.category_name %> / <%= product.subcategory_name %>
+                </span>
+              </td>
+              <td>
+                <% if (product.stock <= 5) { %>
+                <span class="badge bg-warning text-dark"><%= product.stock %></span>
+                <% } else if (product.stock === 0) { %>
+                <span class="badge bg-danger">Out of Stock</span>
+                <% } else { %>
+                <span class="badge bg-success"><%= product.stock %></span>
+                <% } %>
+              </td>
+              <td><%= product.cost %> EGP</td>
+              <td><%= product.price %> EGP</td>
+              <td>
+                <% const profit = product.price - product.cost; %>
+                <% const profitPercent = product.cost > 0 ? (profit / product.cost) * 100 : 0; %>
+                <% if (profit > 0) { %>
+                <span class="text-success">
+                  <i class="fas fa-arrow-up me-1"></i>
+                  <%= profit.toFixed(2) %> EGP (<%= profitPercent.toFixed(1) %>%)
+                </span>
+                <% } else if (profit < 0) { %>
+                <span class="text-danger">
+                  <i class="fas fa-arrow-down me-1"></i>
+                  <%= Math.abs(profit).toFixed(2) %> EGP (<%= Math.abs(profitPercent).toFixed(1) %>%)
+                </span>
+                <% } else { %>
+                <span class="text-muted">
+                  <i class="fas fa-minus me-1"></i>
+                  Break-even
+                </span>
+                <% } %>
+              </td>
+              <td>
+                <% if (product.review_count > 0) { %>
+                  <div class="d-flex align-items-center">
+                    <div class="me-2">
+                      <% for (let i = 1; i <= 5; i++) { %>
+                        <% if (i <= Math.round(product.average_rating)) { %>
+                          <i class="fas fa-star text-warning" style="font-size: 0.8rem;"></i>
+                        <% } else if (i - 0.5 <= product.average_rating) { %>
+                          <i class="fas fa-star-half-alt text-warning" style="font-size: 0.8rem;"></i>
+                        <% } else { %>
+                          <i class="far fa-star text-muted" style="font-size: 0.8rem;"></i>
+                        <% } %>
+                      <% } %>
+                    </div>
+                    <small class="text-muted">
+                      <%= product.average_rating.toFixed(1) %> (<%= product.review_count %>)
+                    </small>
+                  </div>
+                <% } else { %>
+                  <span class="text-muted">
+                    <i class="far fa-star"></i>
+                    <small>No reviews</small>
+                  </span>
+                <% } %>
+              </td>
+              <td>
+                <% if (product.is_active) { %>
+                <span class="badge bg-success">Active</span>
+                <% } else { %>
+                <span class="badge bg-secondary">Inactive</span>
+                <% } %>
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <a href="/admin/products/edit/<%= product.id %>" class="btn btn-outline-primary btn-sm" title="Edit">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  <a href="/admin/products/view/<%= product.id %>" class="btn btn-outline-info btn-sm" title="View Details">
+                    <i class="fas fa-eye"></i>
+                  </a>
+                  <% if (product.is_active) { %>
+                  <button type="button" class="btn btn-outline-danger btn-sm deactivate-product-btn" title="Deactivate" data-product-id="<%= product.id %>" data-product-name="<%= product.name %>">
+                    <i class="fas fa-ban"></i>
+                  </button>
+                  <% } else { %>
+                  <button type="button" class="btn btn-outline-success btn-sm reactivate-product-btn" title="Reactivate" data-product-id="<%= product.id %>" data-product-name="<%= product.name %>">
+                    <i class="fas fa-check"></i>
+                  </button>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <% if (totalPages > 1) { %>
+  <nav aria-label="Products pagination" class="mt-4">
+    <ul class="pagination justify-content-center">
+      <% if (currentPage > 1) { %>
+      <li class="page-item">
+        <a class="page-link" href="?page=<%= currentPage - 1 %>&search=<%= search %>&category=<%= selectedCategory %>&stock=<%= selectedStock %>&rating=<%= selectedRating %>&showInactive=<%= showInactive %>">
+          <i class="fas fa-chevron-left"></i>
+        </a>
+      </li>
+      <% } %>
+      
+      <% for (let i = 1; i <= totalPages; i++) { %>
+      <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+        <a class="page-link" href="?page=<%= i %>&search=<%= search %>&category=<%= selectedCategory %>&stock=<%= selectedStock %>&rating=<%= selectedRating %>&showInactive=<%= showInactive %>">
+          <%= i %>
+        </a>
+      </li>
+      <% } %>
+      
+      <% if (currentPage < totalPages) { %>
+      <li class="page-item">
+        <a class="page-link" href="?page=<%= currentPage + 1 %>&search=<%= search %>&category=<%= selectedCategory %>&stock=<%= selectedStock %>&rating=<%= selectedRating %>&showInactive=<%= showInactive %>">
+          <i class="fas fa-chevron-right"></i>
+        </a>
+      </li>
+      <% } %>
+    </ul>
+  </nav>
+  <% } %>
+</div>
+
+<!-- Deactivate Confirmation Modal -->
+<div class="modal fade" id="deactivateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirm Deactivation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to deactivate the product "<span id="productName"></span>"?</p>
+        <p class="text-warning"><small>This product will be hidden from customers but can be reactivated later.</small></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="deactivateForm" method="POST" style="display: inline;">
+          <button type="submit" class="btn btn-warning">Deactivate Product</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reactivate Confirmation Modal -->
+<div class="modal fade" id="reactivateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirm Reactivation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to reactivate the product "<span id="reactivateProductName"></span>"?</p>
+        <p class="text-success"><small>This product will be visible to customers again.</small></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="reactivateForm" method="POST" style="display: inline;">
+          <button type="submit" class="btn btn-success">Reactivate Product</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/adminProducts.js" defer></script> 
