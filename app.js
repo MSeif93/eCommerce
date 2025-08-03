@@ -935,45 +935,6 @@ app.post(
   }
 );
 
-// GET /categories (public route for users)
-// app.get("/categories", async (req, res) => {
-//   try {
-//     const categoriesResult = await db.query(`
-//       SELECT
-//         c.id,
-//         c.main_category,
-//         c.description,
-//         c.created_at,
-//         i.icon_class,
-//         COALESCE(p.product_count, 0) AS product_count,
-//         COALESCE(s.subcategory_count, 0) AS subcategory_count
-//       FROM categories c
-//       LEFT JOIN icon_options i ON c.icon_id = i.id
-//       LEFT JOIN (
-//         SELECT sc.category_id, COUNT(p.id) AS product_count
-//         FROM products p
-//         JOIN sub_categories sc ON p.subcategory_id = sc.id
-//         GROUP BY sc.category_id
-//       ) p ON c.id = p.category_id
-//       LEFT JOIN (
-//         SELECT category_id, COUNT(*) AS subcategory_count
-//         FROM sub_categories
-//         GROUP BY category_id
-//       ) s ON c.id = s.category_id
-//       ORDER BY c.main_category ASC
-//     `);
-
-//     res.render("categories", {
-//       title: "Categories",
-//       user: req.user,
-//       categories: categoriesResult.rows,
-//     });
-//   } catch (err) {
-//     console.error("Error loading categories:", err);
-//     res.status(500).send("Something went wrong loading categories.");
-//   }
-// });
-
 // GET /admin/categories (admin route for management)
 app.get("/admin/categories", async (req, res) => {
   if (!req.isAuthenticated()) {
@@ -1917,6 +1878,303 @@ app.post("/admin/admins/edit/:id", async (req, res) => {
     console.error("Error updating admin:", err);
     req.flash("error", "Failed to update admin. Please try again.");
     res.redirect(`/admin/admins/edit/${id}`);
+  }
+});
+
+// GET /admin/orders/pending
+app.get("/admin/orders/pending", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(403).send("Unauthorized");
+    }
+
+    // Get pending orders with customer and shipping information
+    const pendingOrdersResult = await db.query(`
+      SELECT 
+        o.id,
+        o.order_number,
+        o.guest_name,
+        o.guest_email,
+        o.guest_phone,
+        o.guest_address,
+        o.total,
+        o.status,
+        o.created_at,
+        so.name as shipping_city,
+        so.price as shipping_price
+      FROM orders o
+      LEFT JOIN shipping_options so ON o.shipping_city_id = so.id
+      WHERE o.status = 'pending'
+      ORDER BY o.created_at DESC
+    `);
+
+    // Get order items for each order
+    const pendingOrders = [];
+    for (const order of pendingOrdersResult.rows) {
+      const itemsResult = await db.query(
+        `
+        SELECT 
+          oi.quantity,
+          p.name as product_name,
+          p.price as product_price
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = $1
+      `,
+        [order.id]
+      );
+
+      order.items = itemsResult.rows;
+      pendingOrders.push(order);
+    }
+
+    // Calculate summary statistics
+    const totalValue = pendingOrders.reduce(
+      (sum, order) => sum + parseFloat(order.total),
+      0
+    );
+    const ordersWithShipping = pendingOrders.filter(
+      (order) => order.shipping_city
+    ).length;
+    const uniqueCustomers = new Set(
+      pendingOrders.map((order) => order.guest_email)
+    ).size;
+
+    // Only call req.flash("error") and req.flash("success") ONCE each
+    const error = req.flash("error")[0] || "";
+    const success = req.flash("success")[0] || "";
+
+    res.render("adminPendingOrders", {
+      user: req.user,
+      pendingOrders,
+      totalValue,
+      ordersWithShipping,
+      uniqueCustomers,
+      error,
+      success,
+      flashError: error,
+      flashSuccess: success,
+    });
+  } catch (err) {
+    console.error("Error loading pending orders:", err);
+    res.status(500).send("Failed to load pending orders.");
+  }
+});
+
+// POST /admin/orders/process/:id
+app.post("/admin/orders/process/:id", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(403).json({ success: false, error: "Unauthorized" });
+    }
+
+    const { id } = req.params;
+
+    // Update order status to 'processed'
+    await db.query(
+      "UPDATE orders SET status = 'processed', updated_at = NOW() WHERE id = $1",
+      [id]
+    );
+
+    // Log the action
+    await logAdminAction({
+      admin_id: req.user.id,
+      admin_name: req.user.name,
+      action: "update",
+      table_name: "orders",
+      record_id: id,
+      message: `Processed order #${id}`,
+    });
+
+    res.json({ success: true, message: "Order processed successfully" });
+  } catch (err) {
+    console.error("Error processing order:", err);
+    res.status(500).json({ success: false, error: "Failed to process order" });
+  }
+});
+
+// POST /admin/orders/process-multiple
+app.post("/admin/orders/process-multiple", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(403).json({ success: false, error: "Unauthorized" });
+    }
+
+    const { orderIds } = req.body;
+
+    if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, error: "No orders selected" });
+    }
+
+    // Update multiple orders status to 'processed'
+    const result = await db.query(
+      "UPDATE orders SET status = 'processed', updated_at = NOW() WHERE id = ANY($1) AND status = 'pending'",
+      [orderIds]
+    );
+
+    // Log the action
+    await logAdminAction({
+      admin_id: req.user.id,
+      admin_name: req.user.name,
+      action: "update",
+      table_name: "orders",
+      message: `Processed ${result.rowCount} orders: ${orderIds.join(", ")}`,
+    });
+
+    res.json({
+      success: true,
+      processedCount: result.rowCount,
+      message: `${result.rowCount} orders processed successfully`,
+    });
+  } catch (err) {
+    console.error("Error processing multiple orders:", err);
+    res.status(500).json({ success: false, error: "Failed to process orders" });
+  }
+});
+
+// GET /admin/orders/details/:id
+app.get("/admin/orders/details/:id", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(403).json({ success: false, error: "Unauthorized" });
+    }
+
+    const { id } = req.params;
+
+    // Get order details
+    const orderResult = await db.query(
+      `
+      SELECT 
+        o.id,
+        o.order_number,
+        o.guest_name,
+        o.guest_email,
+        o.guest_phone,
+        o.guest_address,
+        o.total,
+        o.status,
+        o.created_at,
+        so.name as shipping_city,
+        so.price as shipping_price
+      FROM orders o
+      LEFT JOIN shipping_options so ON o.shipping_city_id = so.id
+      WHERE o.id = $1
+    `,
+      [id]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Order not found" });
+    }
+
+    const order = orderResult.rows[0];
+
+    // Get order items
+    const itemsResult = await db.query(
+      `
+      SELECT 
+        oi.quantity,
+        oi.price as item_price,
+        p.name as product_name,
+        p.image as product_image
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      WHERE oi.order_id = $1
+    `,
+      [id]
+    );
+
+    order.items = itemsResult.rows;
+
+    // Generate HTML for modal
+    const html = `
+      <div class="row">
+        <div class="col-md-6">
+          <h6 class="text-primary">Order Information</h6>
+          <p><strong>Order ID:</strong> #${order.id}</p>
+          <p><strong>Status:</strong> <span class="badge bg-${
+            order.status === "pending" ? "warning" : "success"
+          }">${order.status}</span></p>
+          <p><strong>Date:</strong> ${new Date(
+            order.created_at
+          ).toLocaleString()}</p>
+          <p><strong>Total:</strong> <span class="text-success fw-bold">${
+            order.total
+          } EGP</span></p>
+        </div>
+        <div class="col-md-6">
+          <h6 class="text-primary">Customer Information</h6>
+          <p><strong>Name:</strong> ${order.guest_name}</p>
+          <p><strong>Email:</strong> ${order.guest_email}</p>
+          <p><strong>Phone:</strong> ${order.guest_phone || "N/A"}</p>
+          <p><strong>Address:</strong> ${order.guest_address || "N/A"}</p>
+        </div>
+      </div>
+      <hr>
+      <div class="row">
+        <div class="col-12">
+          <h6 class="text-primary">Order Items</h6>
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Quantity</th>
+                  <th>Price</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${order.items
+                  .map(
+                    (item) => `
+                  <tr>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <img src="${
+                          item.product_image || "/images/placeholder.jpg"
+                        }" alt="${
+                      item.product_name
+                    }" class="me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                        <span>${item.product_name}</span>
+                      </div>
+                    </td>
+                    <td>${item.quantity}</td>
+                    <td>${item.item_price} EGP</td>
+                    <td>${(item.quantity * item.item_price).toFixed(2)} EGP</td>
+                  </tr>
+                `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      ${
+        order.shipping_city
+          ? `
+        <hr>
+        <div class="row">
+          <div class="col-12">
+            <h6 class="text-primary">Shipping Information</h6>
+            <p><strong>City:</strong> ${order.shipping_city}</p>
+            <p><strong>Shipping Cost:</strong> ${order.shipping_price} EGP</p>
+          </div>
+        </div>
+      `
+          : ""
+      }
+    `;
+
+    res.json({ success: true, html });
+  } catch (err) {
+    console.error("Error loading order details:", err);
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to load order details" });
   }
 });
 
